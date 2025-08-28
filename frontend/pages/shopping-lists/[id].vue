@@ -1,4 +1,4 @@
-<template>
+<!-- Recipe References -->      <!-- Reorder Labels -->            <!-- Checked Items for this label -->            <!-- Unchecked Items --><template>
   <v-container
     v-if="shoppingList"
     class="md-container"
@@ -154,42 +154,43 @@
       </div>
 
       <div
-        v-for="(value, key) in itemsByLabel"
-        :key="key"
+        v-for="labelName in allVisibleLabels"
+        :key="labelName"
         class="pb-4"
       >
         <v-btn
-          :color="getLabelColor(value[0]) ? getLabelColor(value[0]) : '#959595'"
+          :color="getLabelColor(itemsByLabel[labelName]?.[0] || checkedItemsByLabel[labelName]?.[0]) ? getLabelColor(itemsByLabel[labelName]?.[0] || checkedItemsByLabel[labelName]?.[0]) : '#959595'"
           :style="{
-            'color': getTextColor(getLabelColor(value[0])),
+            'color': getTextColor(getLabelColor(itemsByLabel[labelName]?.[0] || checkedItemsByLabel[labelName]?.[0])),
             'letter-spacing': 'normal',
           }"
-          @click="toggleShowLabel(key.toString())"
+          @click="toggleShowLabel(labelName.toString())"
         >
           <v-icon>
-            {{ labelOpenState[key] ? $globals.icons.chevronDown : $globals.icons.chevronRight }}
+            {{ labelOpenState[labelName] ? $globals.icons.chevronDown : $globals.icons.chevronRight }}
           </v-icon>
-          {{ key }}
+          {{ labelName }}
         </v-btn>
         <v-divider />
         <v-expand-transition>
-          <div v-if="labelOpenState[key]">
+          <div v-if="labelOpenState[labelName]">
             <VueDraggable
-              :model-value="value"
+              v-if="itemsByLabel[labelName] && itemsByLabel[labelName].length > 0"
+              :model-value="itemsByLabel[labelName]"
               handle=".handle"
               :delay="250"
               :delay-on-touch-only="true"
               @start="loadingCounter += 1"
               @end="loadingCounter -= 1"
-              @update:model-value="updateIndexUncheckedByLabel(key.toString(), $event)"
+              @update:model-value="updateIndexUncheckedByLabel(labelName.toString(), $event)"
             >
               <v-lazy
-                v-for="(item, index) in value"
+                v-for="(item, index) in itemsByLabel[labelName]"
                 :key="item.id"
                 class="ml-2 my-2"
               >
                 <ShoppingListItem
-                  v-model="value[index]"
+                  v-model="itemsByLabel[labelName][index]"
                   :labels="allLabels || []"
                   :units="allUnits || []"
                   :foods="allFoods || []"
@@ -200,11 +201,72 @@
                 />
               </v-lazy>
             </VueDraggable>
+
+            <div
+              v-if="showCheckedItems && checkedItemsByLabel[labelName] && checkedItemsByLabel[labelName].length > 0"
+              class="mt-4 ml-2"
+            >
+              <div class="d-flex align-center mb-2">
+                <button @click="toggleShowCheckedForLabel(labelName.toString())" class="d-flex align-center">
+                  <v-icon class="mr-1" size="small">
+                    {{ checkedLabelOpenState[labelName] ? $globals.icons.chevronDown : $globals.icons.chevronRight }}
+                  </v-icon>
+                  <span class="text-caption text-medium-emphasis">
+                    {{ $t('shopping-list.items-checked-count', checkedItemsByLabel[labelName].length) }}
+                  </span>
+                </button>
+                <v-spacer />
+                <div class="d-flex">
+                  <v-btn
+                    icon
+                    size="small"
+                    variant="text"
+                    @click="uncheckAllForLabel(labelName.toString())"
+                    :title="$t('shopping-list.uncheck-all-items')"
+                  >
+                    <v-icon size="small">
+                      {{ $globals.icons.checkboxBlankOutline }}
+                    </v-icon>
+                  </v-btn>
+                  <v-btn
+                    icon
+                    size="small"
+                    variant="text"
+                    @click="deleteCheckedForLabel(labelName.toString())"
+                    :title="$t('shopping-list.delete-checked')"
+                  >
+                    <v-icon size="small">
+                      {{ $globals.icons.delete }}
+                    </v-icon>
+                  </v-btn>
+                </div>
+              </div>
+              <v-expand-transition>
+                <div v-if="checkedLabelOpenState[labelName]">
+                  <div
+                    v-for="(item, idx) in checkedItemsByLabel[labelName]"
+                    :key="item.id"
+                    class="my-1"
+                  >
+                    <ShoppingListItem
+                      v-model="checkedItemsByLabel[labelName][idx]"
+                      class="strike-through-note"
+                      :labels="allLabels || []"
+                      :units="allUnits || []"
+                      :foods="allFoods || []"
+                      :hide-completed-summary="!showCheckedSummary"
+                      @checked="saveListItem"
+                      @save="saveListItem"
+                      @delete="deleteListItem(item)"
+                    />
+                  </div>
+                </div>
+              </v-expand-transition>
+            </div>
           </div>
         </v-expand-transition>
       </div>
 
-      <!-- Reorder Labels -->
       <BaseDialog
         v-model="reorderLabelsDialog"
         :icon="$globals.icons.tagArrowUp"
@@ -241,66 +303,8 @@
           </VueDraggable>
         </v-card>
       </BaseDialog>
-
-      <!-- Checked Items -->
-      <div
-        v-if="listItems.checked && listItems.checked.length > 0"
-        class="mt-6"
-      >
-        <div class="d-flex">
-          <div class="flex-grow-1">
-            <button @click="toggleShowChecked()">
-              <span>
-                <v-icon>
-                  {{ showChecked ? $globals.icons.chevronDown : $globals.icons.chevronRight }}
-                </v-icon>
-              </span>
-              {{ $t('shopping-list.items-checked-count', listItems.checked ? listItems.checked.length : 0) }}
-            </button>
-          </div>
-          <div class="justify-end mt-n2">
-            <BaseButtonGroup
-              :buttons="[
-                {
-                  icon: $globals.icons.checkboxBlankOutline,
-                  text: $t('shopping-list.uncheck-all-items'),
-                  event: 'uncheck',
-                },
-                {
-                  icon: $globals.icons.delete,
-                  text: $t('shopping-list.delete-checked'),
-                  event: 'delete',
-                },
-              ]"
-              @uncheck="openUncheckAll"
-              @delete="openDeleteChecked"
-            />
-          </div>
-        </div>
-        <v-divider class="my-4" />
-        <v-expand-transition>
-          <div v-if="showChecked">
-            <div
-              v-for="(item, idx) in listItems.checked"
-              :key="item.id"
-            >
-              <ShoppingListItem
-                v-model="listItems.checked[idx]"
-                class="strike-through-note"
-                :labels="allLabels || []"
-                :units="allUnits || []"
-                :foods="allFoods || []"
-                @checked="saveListItem"
-                @save="saveListItem"
-                @delete="deleteListItem(item)"
-              />
-            </div>
-          </div>
-        </v-expand-transition>
-      </div>
     </section>
 
-    <!-- Recipe References -->
     <v-lazy
       v-if="shoppingList.recipeReferences && shoppingList.recipeReferences.length > 0"
     >
@@ -361,6 +365,27 @@
       </section>
     </v-lazy>
     <WakelockSwitch />
+    <div
+      class="d-print-none d-flex px-2"
+      :class="$vuetify.display.smAndDown ? 'justify-center' : 'justify-end'"
+    >
+      <v-switch
+        v-model="showCheckedItems"
+        color="primary"
+        :label="$t('shopping-list.show-checked-items')"
+      />
+    </div>
+    <div
+      v-if="showCheckedItems"
+      class="d-print-none d-flex px-2"
+      :class="$vuetify.display.smAndDown ? 'justify-center' : 'justify-end'"
+    >
+      <v-switch
+        v-model="showCheckedSummary"
+        color="primary"
+        :label="$t('shopping-list.show-completion-dates')"
+      />
+    </div>
   </v-container>
 </template>
 
@@ -402,6 +427,69 @@ export default defineNuxtComponent({
     const { store: allUnits } = useUnitStore();
     const { store: allFoods } = useFoodStore();
 
+    const checkedLabelOpenState = ref<{[key: string]: boolean}>({});
+    const showCheckedItems = ref(true);
+    const showCheckedSummary = ref(true);
+
+    const checkedItemsByLabel = computed(() => {
+      if (!shoppingListPage.listItems?.checked) {
+        return {};
+      }
+
+      const grouped: {[key: string]: any[]} = {};
+
+      shoppingListPage.listItems.checked.forEach(item => {
+        const labelName = item.label?.name || 'No Label';
+        if (!grouped[labelName]) {
+          grouped[labelName] = [];
+        }
+        grouped[labelName].push(item);
+      });
+
+      return grouped;
+    });
+
+    const allVisibleLabels = computed(() => {
+      const labels = new Set<string>();
+
+      if (shoppingListPage.itemsByLabel?.value) {
+        Object.keys(shoppingListPage.itemsByLabel.value).forEach(label => {
+          labels.add(label);
+        });
+      }
+
+      if (showCheckedItems.value && checkedItemsByLabel.value) {
+        Object.keys(checkedItemsByLabel.value).forEach(label => {
+          labels.add(label);
+        });
+      }
+
+      return Array.from(labels).sort();
+    });
+
+    function toggleShowCheckedForLabel(labelName: string) {
+      checkedLabelOpenState.value[labelName] = !checkedLabelOpenState.value[labelName];
+    }
+
+    async function uncheckAllForLabel(labelName: string) {
+      const itemsToUncheck = checkedItemsByLabel.value[labelName];
+      if (!itemsToUncheck) return;
+
+      for (const item of itemsToUncheck) {
+        item.checked = false;
+        await shoppingListPage.saveListItem(item);
+      }
+    }
+
+    async function deleteCheckedForLabel(labelName: string) {
+      const itemsToDelete = checkedItemsByLabel.value[labelName];
+      if (!itemsToDelete) return;
+
+      for (const item of itemsToDelete) {
+        await shoppingListPage.deleteListItem(item);
+      }
+    }
+
     return {
       groupSlug,
       preferences,
@@ -410,6 +498,14 @@ export default defineNuxtComponent({
       allFoods,
       getTextColor,
       mdAndUp,
+      checkedLabelOpenState,
+      checkedItemsByLabel,
+      allVisibleLabels,
+      showCheckedItems,
+      showCheckedSummary,
+      toggleShowCheckedForLabel,
+      uncheckAllForLabel,
+      deleteCheckedForLabel,
       ...shoppingListPage,
     };
   },
@@ -419,5 +515,9 @@ export default defineNuxtComponent({
 <style scoped>
 .number-input-container {
   max-width: 50px;
+}
+
+.strike-through-note {
+  opacity: 0.7;
 }
 </style>

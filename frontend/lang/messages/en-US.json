@@ -898,7 +898,9 @@
     "are-you-sure-you-want-to-check-all-items": "Are you sure you want to check all items?",
     "are-you-sure-you-want-to-uncheck-all-items": "Are you sure you want to uncheck all items?",
     "are-you-sure-you-want-to-delete-checked-items": "Are you sure you want to delete all checked items?",
-    "no-shopping-lists-found": "No Shopping Lists Found"
+    "no-shopping-lists-found": "No Shopping Lists Found",
+    "show-checked-items": "Show Checked",
+    "show-completion-dates": "Show Completed Dates"
   },
   "sidebar": {
     "all-recipes": "All Recipes",

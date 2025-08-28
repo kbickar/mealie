@@ -123,7 +123,7 @@
       </v-col>
     </v-row>
     <v-row
-      v-if="listItem.checked"
+      v-if="listItem.checked && !hideCompletedSummary"
       no-gutters
       class="mb-2"
     >
@@ -189,6 +189,10 @@ export default defineNuxtComponent({
     recipes: {
       type: Map<string, RecipeSummary>,
       default: undefined,
+    },
+    hideCompletedSummary: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["checked", "update:modelValue", "save", "delete"],
